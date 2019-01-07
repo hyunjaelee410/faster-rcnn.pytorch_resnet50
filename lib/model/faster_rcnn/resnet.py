@@ -199,7 +199,6 @@ class resnet(_fasterRCNN):
         # Remove 'module.' from key to load weights
         converted_name = name.replace('module.', '')
         converted_state_dict[converted_name] = weight
-        print(converted_name)
       del state_dict
 
       resnet.load_state_dict(converted_state_dict)

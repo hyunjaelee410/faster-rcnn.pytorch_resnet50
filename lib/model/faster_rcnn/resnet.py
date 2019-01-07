@@ -13,13 +13,11 @@ import math
 import torch.utils.model_zoo as model_zoo
 import pdb
 
-__all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
+__all__ = ['ResNet', 'resnet50', 'resnet101',
        'resnet152']
 
 
 model_urls = {
-  'resnet18': 'https://s3.amazonaws.com/pytorch/models/resnet18-5c106cde.pth',
-  'resnet34': 'https://s3.amazonaws.com/pytorch/models/resnet34-333f7ec4.pth',
   'resnet50': 'https://s3.amazonaws.com/pytorch/models/resnet50-19c8e357.pth',
   'resnet101': 'https://s3.amazonaws.com/pytorch/models/resnet101-5d3b4d8f.pth',
   'resnet152': 'https://s3.amazonaws.com/pytorch/models/resnet152-b121ed2d.pth',
@@ -31,42 +29,10 @@ def conv3x3(in_planes, out_planes, stride=1):
            padding=1, bias=False)
 
 
-class BasicBlock(nn.Module):
-  expansion = 1
-
-  def __init__(self, inplanes, planes, stride=1, downsample=None):
-    super(BasicBlock, self).__init__()
-    self.conv1 = conv3x3(inplanes, planes, stride)
-    self.bn1 = nn.BatchNorm2d(planes)
-    self.relu = nn.ReLU(inplace=True)
-    self.conv2 = conv3x3(planes, planes)
-    self.bn2 = nn.BatchNorm2d(planes)
-    self.downsample = downsample
-    self.stride = stride
-
-  def forward(self, x):
-    residual = x
-
-    out = self.conv1(x)
-    out = self.bn1(out)
-    out = self.relu(out)
-
-    out = self.conv2(out)
-    out = self.bn2(out)
-
-    if self.downsample is not None:
-      residual = self.downsample(x)
-
-    out += residual
-    out = self.relu(out)
-
-    return out
-
-
 class Bottleneck(nn.Module):
   expansion = 4
 
-  def __init__(self, inplanes, planes, stride=1, downsample=None):
+  def __init__(self, inplanes, planes, stride=1, downsample=None, attlayer=None):
     super(Bottleneck, self).__init__()
     self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, stride=stride, bias=False) # change
     self.bn1 = nn.BatchNorm2d(planes)
@@ -78,6 +44,11 @@ class Bottleneck(nn.Module):
     self.relu = nn.ReLU(inplace=True)
     self.downsample = downsample
     self.stride = stride
+
+    if attlayer == None:
+      self.gate = None
+    else:
+      self.gate = attlayer(planes * 4)
 
   def forward(self, x):
     residual = x
@@ -96,6 +67,9 @@ class Bottleneck(nn.Module):
     if self.downsample is not None:
       residual = self.downsample(x)
 
+    if self.gate != None:
+      out = self.gate(out)
+
     out += residual
     out = self.relu(out)
 
@@ -103,7 +77,18 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-  def __init__(self, block, layers, num_classes=1000):
+  def __init__(self, block, layers, num_classes=1000, attention_type=None):
+    if attention_type == None:
+      self.attlayer = None
+    elif attention_type == 'se':
+      from .attention_layers import SELayer as attention_layers
+      self.attlayer = attention_layers
+    elif attention_type == 'style_attention':
+      from .attention_layers import StyleAttentionLayer as attention_layers
+      self.attlayer = attention_layers
+    else:
+      raise NotImplementedError
+
     self.inplanes = 64
     super(ResNet, self).__init__()
     self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
@@ -115,8 +100,7 @@ class ResNet(nn.Module):
     self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
     self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
     self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
-    # it is slightly better whereas slower to set stride = 1
-    # self.layer4 = self._make_layer(block, 512, layers[3], stride=1)
+
     self.avgpool = nn.AvgPool2d(7)
     self.fc = nn.Linear(512 * block.expansion, num_classes)
 
@@ -138,10 +122,10 @@ class ResNet(nn.Module):
       )
 
     layers = []
-    layers.append(block(self.inplanes, planes, stride, downsample))
+    layers.append(block(self.inplanes, planes, stride, downsample, attlayer=self.attlayer))
     self.inplanes = planes * block.expansion
     for i in range(1, blocks):
-      layers.append(block(self.inplanes, planes))
+      layers.append(block(self.inplanes, planes, attlayer=self.attlayer))
 
     return nn.Sequential(*layers)
 
@@ -163,95 +147,62 @@ class ResNet(nn.Module):
     return x
 
 
-def resnet18(pretrained=False):
-  """Constructs a ResNet-18 model.
-  Args:
-    pretrained (bool): If True, returns a model pre-trained on ImageNet
-  """
-  model = ResNet(BasicBlock, [2, 2, 2, 2])
-  if pretrained:
-    model.load_state_dict(model_zoo.load_url(model_urls['resnet18']))
+def resnet50(attention_type=None):
+  model = ResNet(Bottleneck, [3, 4, 6, 3], attention_type=attention_type)
   return model
 
 
-def resnet34(pretrained=False):
-  """Constructs a ResNet-34 model.
-  Args:
-    pretrained (bool): If True, returns a model pre-trained on ImageNet
-  """
-  model = ResNet(BasicBlock, [3, 4, 6, 3])
-  if pretrained:
-    model.load_state_dict(model_zoo.load_url(model_urls['resnet34']))
+def resnet101(attention_type=None):
+  model = ResNet(Bottleneck, [3, 4, 23, 3], attention_type=attention_type)
   return model
 
 
-def resnet50(pretrained=False):
-  """Constructs a ResNet-50 model.
-  Args:
-    pretrained (bool): If True, returns a model pre-trained on ImageNet
-  """
-  model = ResNet(Bottleneck, [3, 4, 6, 3])
-  if pretrained:
-    model.load_state_dict(model_zoo.load_url(model_urls['resnet50']))
-  return model
-
-
-def resnet101(pretrained=False):
-  """Constructs a ResNet-101 model.
-  Args:
-    pretrained (bool): If True, returns a model pre-trained on ImageNet
-  """
-  model = ResNet(Bottleneck, [3, 4, 23, 3])
-  if pretrained:
-    model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
-  return model
-
-
-def resnet152(pretrained=False):
-  """Constructs a ResNet-152 model.
-  Args:
-    pretrained (bool): If True, returns a model pre-trained on ImageNet
-  """
-  model = ResNet(Bottleneck, [3, 8, 36, 3])
-  if pretrained:
-    model.load_state_dict(model_zoo.load_url(model_urls['resnet152']))
+def resnet152(attention_type=None):
+  model = ResNet(Bottleneck, [3, 8, 36, 3], attention_type=attention_type)
   return model
 
 class resnet(_fasterRCNN):
-  def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False):
+  def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False, attention_type=None):
     self.dout_base_model = 1024
     if num_layers==101:
+        # TODO
         self.model_path = 'data/pretrained_model/resnet101-5d3b4d8f.pth'
     elif num_layers==50:
-        self.model_path = 'data/pretrained_model/resnet50-19c8e357.pth'
-    elif num_layers==34:
-        self.model_path = 'data/pretrained_model/resnet34-333f7ec4.pth'
-        self.dout_base_model = 256
-    elif num_layers==18:
-        self.model_path = 'data/pretrained_model/resnet18-5c106cde.pth'
-        self.dout_base_model = 256
+        if attention_type == None:
+            self.model_path = 'pretrained_model/resnet50_none/model_best.pth.tar'
+        elif attention_type == 'se':
+            self.model_path = 'pretrained_model/resnet50_se/model_best.pth.tar'
+        elif attention_type == 'style_attention':
+            self.model_path = 'pretrained_model/resnet50_sa/model_best.pth.tar'
+        else:
+            raise NotImplementedError
     
     self.pretrained = pretrained
     self.class_agnostic = class_agnostic
     self.num_layers=num_layers
+    self.attention_type = attention_type
 
     _fasterRCNN.__init__(self, classes, class_agnostic)
 
   def _init_modules(self):
     if self.num_layers==101:
-        resnet = resnet101()
+        resnet = resnet101(self.attention_type)
     elif self.num_layers==50:
-        resnet = resnet50()
-    elif self.num_layers==34:
-        resnet = resnet34()
-    elif self.num_layers==18:
-        resnet = resnet18()
-    
+        resnet = resnet50(self.attention_type)
 
     if self.pretrained == True:
       print("Loading pretrained weights from %s" %(self.model_path))
-      state_dict = torch.load(self.model_path)
-      resnet.load_state_dict({k:v for k,v in state_dict.items() if k in resnet.state_dict()})
+      state_dict = torch.load(self.model_path)['state_dict']
+      converted_state_dict = {}
+
+      for name, weight in state_dict.items():
+        # Remove 'module.' from key to load weights
+        converted_name = name.replace('module.', '')
+        converted_state_dict[converted_name] = weight
+        print(converted_name)
+      del state_dict
+
+      resnet.load_state_dict(converted_state_dict)
 
     # Build resnet.
     self.RCNN_base = nn.Sequential(resnet.conv1, resnet.bn1,resnet.relu,

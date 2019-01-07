@@ -78,6 +78,8 @@ def parse_args():
   parser.add_argument('--cag', dest='class_agnostic',
                       help='whether perform class_agnostic bbox regression',
                       action='store_true')
+  parser.add_argument('--attention_type', type=str, metavar='Attention',
+                      help='attention type {se, style_attention} (default: None)')
 
 # config optimization
   parser.add_argument('--o', dest='optimizer',
@@ -199,7 +201,9 @@ if __name__ == '__main__':
 
   print('{:d} roidb entries'.format(len(roidb)))
 
-  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset
+  attention_type = args.attention_type if args.attention_type != None else 'none'
+
+  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -234,23 +238,17 @@ if __name__ == '__main__':
     cfg.CUDA = True
 
   # initilize the network here.
-  if args.net == 'vgg16':
-    fasterRCNN = vgg16(imdb.classes, pretrained=True, class_agnostic=args.class_agnostic)
-  elif args.net == 'res101':
-    fasterRCNN = resnet(imdb.classes, 101, pretrained=True, class_agnostic=args.class_agnostic)
+  if args.net == 'res101':
+    fasterRCNN = resnet(imdb.classes, 101, pretrained=True, class_agnostic=args.class_agnostic, attention_type=args.attention_type)
   elif args.net == 'res50':
-    fasterRCNN = resnet(imdb.classes, 50, pretrained=True, class_agnostic=args.class_agnostic)
-  elif args.net == 'res34':
-    fasterRCNN = resnet(imdb.classes, 34, pretrained=True, class_agnostic=args.class_agnostic)
-  elif args.net == 'res18':
-    fasterRCNN = resnet(imdb.classes, 18, pretrained=True, class_agnostic=args.class_agnostic)
-  elif args.net == 'res152':
-    fasterRCNN = resnet(imdb.classes, 152, pretrained=True, class_agnostic=args.class_agnostic)
+    fasterRCNN = resnet(imdb.classes, 50, pretrained=True, class_agnostic=args.class_agnostic, attention_type=args.attention_type)
   else:
     print("network is not defined")
     pdb.set_trace()
 
   fasterRCNN.create_architecture()
+
+  print(fasterRCNN)
 
   lr = cfg.TRAIN.LEARNING_RATE
   lr = args.lr

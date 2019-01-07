@@ -80,11 +80,10 @@ def parse_args():
                       action='store_true')
   parser.add_argument('--attention_type', type=str, metavar='Attention',
                       help='attention type {se, style_attention} (default: None)')
+  parser.add_argument('--affine_lr', default=10.0, type=float, metavar='M',
+                      help='lr mutiplier for affine_gate (default: 10)')
 
 # config optimization
-  parser.add_argument('--o', dest='optimizer',
-                      help='training optimizer',
-                      default="sgd", type=str)
   parser.add_argument('--lr', dest='lr',
                       help='starting learning rate',
                       default=0.001, type=float)
@@ -261,15 +260,12 @@ if __name__ == '__main__':
       if 'bias' in key:
         params += [{'params':[value],'lr':lr*(cfg.TRAIN.DOUBLE_BIAS + 1), \
                 'weight_decay': cfg.TRAIN.BIAS_DECAY and cfg.TRAIN.WEIGHT_DECAY or 0}]
+      elif 'gate' in key: 
+        params += [{'params':[value],'lr':lr * args.affine_lr, 'weight_decay': 0}]
       else:
         params += [{'params':[value],'lr':lr, 'weight_decay': cfg.TRAIN.WEIGHT_DECAY}]
 
-  if args.optimizer == "adam":
-    lr = lr * 0.1
-    optimizer = torch.optim.Adam(params)
-
-  elif args.optimizer == "sgd":
-    optimizer = torch.optim.SGD(params, momentum=cfg.TRAIN.MOMENTUM)
+  optimizer = torch.optim.SGD(params, momentum=cfg.TRAIN.MOMENTUM)
 
   if args.resume:
     load_name = os.path.join(output_dir,
@@ -328,8 +324,6 @@ if __name__ == '__main__':
       # backward
       optimizer.zero_grad()
       loss.backward()
-      if args.net == "vgg16":
-          clip_gradient(fasterRCNN, 10.)
       optimizer.step()
 
       if step % args.disp_interval == 0:

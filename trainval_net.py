@@ -162,8 +162,8 @@ if __name__ == '__main__':
       args.imdbval_name = "voc_2007_test"
       args.set_cfgs = ['ANCHOR_SCALES', '[8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '20']
   elif args.dataset == "coco":
-      args.imdb_name = "coco_2014_train+coco_2014_valminusminival"
-      args.imdbval_name = "coco_2014_minival"
+      args.imdb_name = "coco_2014_train"
+      args.imdbval_name = "coco_2014_val"
       args.set_cfgs = ['ANCHOR_SCALES', '[4, 8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '50']
   elif args.dataset == "imagenet":
       args.imdb_name = "imagenet_train"
@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
   attention_type = args.attention_type if args.attention_type != None else 'none'
 
-  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type
+  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type + "_" + str(args.affine_lr)
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 

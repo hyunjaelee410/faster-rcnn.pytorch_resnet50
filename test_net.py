@@ -81,6 +81,8 @@ def parse_args():
                       action='store_true')
   parser.add_argument('--attention_type', type=str, metavar='Attention',
                       help='attention type {se, style_attention} (default: None)')
+  parser.add_argument('--affine_lr', default=10.0, type=float, metavar='M',
+                      help='lr mutiplier for affine_gate (default: 10)')
   args = parser.parse_args()
   return args
 
@@ -137,7 +139,7 @@ if __name__ == '__main__':
   print('{:d} roidb entries'.format(len(roidb)))
 
   attention_type = args.attention_type if args.attention_type != None else 'none'
-  input_dir = args.load_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type
+  input_dir = args.load_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type + "_" + str(args.affine_lr)
   if not os.path.exists(input_dir):
     raise Exception('There is no input directory for loading network from ' + input_dir)
   load_name = os.path.join(input_dir, args.checkpoint)

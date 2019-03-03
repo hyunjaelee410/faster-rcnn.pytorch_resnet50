@@ -83,8 +83,8 @@ class ResNet(nn.Module):
     elif attention_type == 'se':
       from .attention_layers import SELayer as attention_layers
       self.attlayer = attention_layers
-    elif attention_type == 'style_attention':
-      from .attention_layers import StyleAttentionLayer as attention_layers
+    elif attention_type == 'srm':
+      from .attention_layers import BNStyleAttentionLayer as attention_layers
       self.attlayer = attention_layers
     else:
       raise NotImplementedError
@@ -162,22 +162,10 @@ def resnet152(attention_type=None):
   return model
 
 class resnet(_fasterRCNN):
-  def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False, attention_type=None):
+  def __init__(self, classes, num_layers=101, pretrained_model=None, class_agnostic=False, attention_type=None):
     self.dout_base_model = 1024
-    if num_layers==101:
-        # TODO
-        self.model_path = 'data/pretrained_model/resnet101-5d3b4d8f.pth'
-    elif num_layers==50:
-        if attention_type == None:
-            self.model_path = 'pretrained_model/resnet50_none/model_best.pth.tar'
-        elif attention_type == 'se':
-            self.model_path = 'pretrained_model/resnet50_se/model_best.pth.tar'
-        elif attention_type == 'style_attention':
-            self.model_path = 'pretrained_model/resnet50_sa/model_best.pth.tar'
-        else:
-            raise NotImplementedError
     
-    self.pretrained = pretrained
+    self.pretrained_model = pretrained_model
     self.class_agnostic = class_agnostic
     self.num_layers=num_layers
     self.attention_type = attention_type
@@ -185,14 +173,12 @@ class resnet(_fasterRCNN):
     _fasterRCNN.__init__(self, classes, class_agnostic)
 
   def _init_modules(self):
-    if self.num_layers==101:
-        resnet = resnet101(self.attention_type)
-    elif self.num_layers==50:
+    if self.num_layers==50:
         resnet = resnet50(self.attention_type)
 
-    if self.pretrained == True:
-      print("Loading pretrained weights from %s" %(self.model_path))
-      state_dict = torch.load(self.model_path)['state_dict']
+    if self.pretrained_model:
+      print("Loading pretrained weights from %s" %(self.pretrained_model))
+      state_dict = torch.load(self.pretrained_model)['state_dict']
       converted_state_dict = {}
 
       for name, weight in state_dict.items():

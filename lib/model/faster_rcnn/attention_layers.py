@@ -4,6 +4,46 @@ import math
 import torch
 from torch.nn.parameter import Parameter
 
+class BNStyleAttentionLayer(nn.Module):
+    def __init__(self, channel):
+        super(BNStyleAttentionLayer, self).__init__()
+
+        self.scale_mean = Parameter(torch.Tensor(channel))
+        self.scale_std = Parameter(torch.Tensor(channel))
+
+        self.scale_mean.data.fill_(0)
+        self.scale_std.data.fill_(0)
+
+        self.activation = nn.Sigmoid()
+        self.bn = nn.BatchNorm2d(channel)
+
+        setattr(self.scale_mean, 'affine_gate', True)
+        setattr(self.scale_std, 'affine_gate', True)
+        setattr(self.bn.weight, 'affine_gate', True)
+        setattr(self.bn.bias, 'affine_gate', True)
+
+    def calc_mean_std(self, feat, eps=1e-5):
+        # eps is a small value added to the variance to avoid divide-by-zero.
+        size = feat.size()
+        assert (len(size) == 4)
+        N, C = size[:2]
+        feat_var = feat.view(N, C, -1).var(dim=2) + eps
+        feat_std = feat_var.sqrt().view(N, C, 1, 1)
+        feat_mean = feat.view(N, C, -1).mean(dim=2).view(N, C, 1, 1)
+        return feat_mean, feat_std
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+
+        feat_mean, feat_std = self.calc_mean_std(x)
+        gate = feat_mean * self.scale_mean[None, :, None, None] + \
+                feat_std * self.scale_std[None, :, None, None]
+
+        gate = self.bn(gate)
+        gate = self.activation(gate)
+
+        return x * gate 
+
 class StyleAttentionLayer(nn.Module):
     def __init__(self, channel):
         super(StyleAttentionLayer, self).__init__()

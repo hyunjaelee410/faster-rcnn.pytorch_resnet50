@@ -80,8 +80,8 @@ def parse_args():
                       action='store_true')
   parser.add_argument('--attention_type', type=str, metavar='Attention',
                       help='attention type {se, style_attention} (default: None)')
-  parser.add_argument('--affine_lr', default=10.0, type=float, metavar='M',
-                      help='lr mutiplier for affine_gate (default: 10)')
+  parser.add_argument('--pretrained_model', type=str, metavar='pretrained path',
+                      help='pretrained checkpoint (default: None)')
 
 # config optimization
   parser.add_argument('--lr', dest='lr',
@@ -202,7 +202,7 @@ if __name__ == '__main__':
 
   attention_type = args.attention_type if args.attention_type != None else 'none'
 
-  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type + "_" + str(args.affine_lr)
+  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + attention_type
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -237,10 +237,8 @@ if __name__ == '__main__':
     cfg.CUDA = True
 
   # initilize the network here.
-  if args.net == 'res101':
-    fasterRCNN = resnet(imdb.classes, 101, pretrained=True, class_agnostic=args.class_agnostic, attention_type=args.attention_type)
-  elif args.net == 'res50':
-    fasterRCNN = resnet(imdb.classes, 50, pretrained=True, class_agnostic=args.class_agnostic, attention_type=args.attention_type)
+  if args.net == 'res50':
+    fasterRCNN = resnet(imdb.classes, 50, pretrained_model=args.pretrained_model, class_agnostic=args.class_agnostic, attention_type=args.attention_type)
   else:
     print("network is not defined")
     pdb.set_trace()
@@ -261,7 +259,7 @@ if __name__ == '__main__':
         params += [{'params':[value],'lr':lr*(cfg.TRAIN.DOUBLE_BIAS + 1), \
                 'weight_decay': cfg.TRAIN.BIAS_DECAY and cfg.TRAIN.WEIGHT_DECAY or 0}]
       elif 'gate' in key: 
-        params += [{'params':[value],'lr':lr * args.affine_lr, 'weight_decay': 0}]
+        params += [{'params':[value],'lr':lr, 'weight_decay': 0}]
       else:
         params += [{'params':[value],'lr':lr, 'weight_decay': cfg.TRAIN.WEIGHT_DECAY}]
 
